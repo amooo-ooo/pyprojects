@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crazy Flask Superchat - Signed in as @{{ username }}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://cdn.socket.io/4.1.2/socket.io.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script type="text/javascript">
+        $(document).ready(function () {
+            const AVATAR = 'https://api.dicebear.com/7.x/identicon/svg?seed=';
+            const IMG_EXTENSIONS = [".png", ".svg", ".webp", ".jpg", ".gif", ".jpeg"];
+            const uid = "{{ uid }}";
+            const HOSTNAME = window.location.hostname;
+            let previous;
+
+
+            var socket = io.connect(HOSTNAME == '127.0.0.1' ? `${HOSTNAME}:5000` : HOSTNAME);
+            socket.on('connect', function () {
+                console.log('Connected!');
+                socket.emit('joined', { uid: uid });
+            });
+
+            // Listen for incoming messages
+            socket.on('message', function (data) {
+                displayMessage(data.username, data.text, data.mode);
+            });
+
+            // Function to display a message
+            function displayMessage(username, text, mode) {
+
+                if (previous == username) {
+                    var messageContainer = $(".contents");
+
+                    if (IMG_EXTENSIONS.some(function (extension) { return text.endsWith(extension); })) {
+                        var messageText = $('<div></div>').addClass('filter');
+                        var img = $('<img>', { src: text });
+                        messageText.append(img);
+                    } else {
+                        var messageText = $('<p></p>').text(text);
+                    }
+
+                    messageContainer.last().append(messageText);
+
+                } else if (mode == 'public') {
+                    var messageContainer = $('<div>').addClass('message-container');
+                    var userImage = $('<img>').addClass('avatar').attr('src', AVATAR + username);
+                    var contents = $('<div>').addClass('contents');
+                    var sentBy = $('<p>').addClass('author').text('Sent by @' + username);
+
+                    if (IMG_EXTENSIONS.some((extension) => text.endsWith(extension))) {
+                        var messageText = $('<div>').addClass('filter');
+                        var img = $('<img>').attr('src', text);
+                        messageText.append(img);
+                    } else {
+                        var messageText = $('<p>').text(text);
+                    }
+                    contents.append(sentBy, messageText);
+                    messageContainer.append(userImage, contents);
+                    $('#chat-area').append(messageContainer);
+
+                } else if (mode == 'server') {
+                    var messageContainer = $('<div>').addClass('server-message');
+                    var sentBy = $('<p>').text(text);
+                    messageContainer.append(sentBy);
+                    $('#chat-area').append(messageContainer);
+                }
+
+                const element = document.getElementById('chat-area');
+                const isAtMaxBottom = (element.scrollHeight - element.scrollTop) === element.clientHeight;
+
+                if (isAtMaxBottom) {
+                    element.scrollTop = document.getElementById('chat-area').scrollHeight;
+                }
+                previous = `${username}`
+            }
+
+            $('#send-button').click(function () {
+                var text = $('#message-input').val();
+                if (text.length > 0) {
+                    socket.emit('message', { uid: uid, text: text });
+                    $('#message-input').val('');
+                }
+            });
+
+            const messageInput = document.getElementById('message-input');
+            messageInput.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter') {
+                    event.preventDefault(); // Prevent the default Enter behavior (e.g., new line)
+                    $('#send-button').click(); // Trigger the send button click
+                }
+            });
+        });
+    </script>
+</head>
+
+<body>
+    <section>
+        <div id="chat-area"></div>
+        <div id="send-message">
+            <input type="text" id="message-input" placeholder="Message @all">
+            <button id="send-button">⚡</button>
+        </div>
+    </section>
+</body>
+
+</html>
